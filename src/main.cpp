@@ -5,6 +5,7 @@
 #define SCAN_DURATION 1
 #define SCAN_WINDOW 100
 #define SCAN_INTERVAL 500
+
 // RSSI thresholds
 #define RSSI_CONNECT -80
 #define RSSI_DISCONNECT -90
@@ -173,7 +174,7 @@ void loop()
         }
         doConnect = false;
     }
-    // ALWAYS scan, because devices could ecome available at any timeb
+    // ALWAYS scan, because devices could become available at any time
 
     scan();
     disconnect_bad_servers(); // ultimately make this asynchronous with FreeRTOS task
