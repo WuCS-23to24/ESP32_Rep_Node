@@ -1,6 +1,7 @@
 #ifndef A3A894A8_7557_423C_AF30_DF2AD1257EE6
 #define A3A894A8_7557_423C_AF30_DF2AD1257EE6
 
+#include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -98,6 +99,47 @@ class ServerCallbacks : public BLEServerCallbacks
     }
 };
 
+/**
+ * Scan for BLE servers and find the first one that advertises the service we are looking for.
+ */
+class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
+{
+    /**
+     * Called for each advertising BLE server.
+     */
+    void onResult(BLEAdvertisedDevice advertisedDevice)
+    {
+        // Only connect to the peripheral if:
+        // - correct service is advertised
+        // - RSSI is high enough
+        if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID) &&
+            (advertisedDevice.getRSSI() >= RSSI_CONNECT))
+        {
+            Serial.println(advertisedDevice.haveServiceUUID());
+            peripheral_device = new BLEAdvertisedDevice(advertisedDevice);
+            doConnect = true;
+            Serial.println("Peripheral found.");
+        }
+        else
+        {
+        }
+    }
+};
+
+class ClientCallback : public BLEClientCallbacks
+{
+    void onConnect(BLEClient *pclient)
+    {
+    }
+
+    void onDisconnect(BLEClient *pclient)
+    {
+        connected = false;
+        digitalWrite(LED_BUILTIN, LOW);
+        Serial.println("onDisconnect...");
+    }
+};
+
 template <typename _UUID_Generator_Type> class Bluetooth
 {
   private:
@@ -146,6 +188,8 @@ template <typename _UUID_Generator_Type> class Bluetooth
             pCharacteristic->notify();
         }
     }
+
+	void connect_to_
 };
 
 #endif /* A3A894A8_7557_423C_AF30_DF2AD1257EE6 */

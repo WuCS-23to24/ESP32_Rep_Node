@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <esp_system.h>
 
-const int wdtTimeout = 250; // time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
 
 void ARDUINO_ISR_ATTR check_gps_data()
@@ -12,11 +11,11 @@ void ARDUINO_ISR_ATTR check_gps_data()
     ets_printf("ISR TRIGGERED\n");
 }
 
-void setup_timer(void (*func)(void) = check_gps_data)
+void setup_timer(void (*func)(void) = check_gps_data, int time_ms = 250, int div = 80)
 {
-    timer = timerBegin(0, 80, true);                    // timer 0, div 80
-    timerAttachInterrupt(timer, func, true);           // attach callback
-    timerAlarmWrite(timer, wdtTimeout * 1000, false);   // set time in us
+    timer = timerBegin(0, div, true);              // timer 0, div 80
+    timerAttachInterrupt(timer, func, true);       // attach callback
+    timerAlarmWrite(timer, time_ms * 1000, false); // set time in us
     timerSetAutoReload(timer, true);
     timerAlarmEnable(timer);
 }

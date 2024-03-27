@@ -2,6 +2,9 @@
 #include <BLEDevice.h>
 #include <vector>
 
+#include "auxiliary.h"
+#include "bluetooth.hpp"
+
 #define SCAN_DURATION 1
 #define SCAN_WINDOW 100
 #define SCAN_INTERVAL 500
@@ -9,10 +12,8 @@
 // RSSI thresholds
 #define RSSI_CONNECT -80
 #define RSSI_DISCONNECT -90
-#define DEVICE_NAME "REPEATER"
 
-static BLEUUID serviceUUID(SERVICE_UUID);
-static BLEUUID charUUID(CHARACTERISTIC_UUID);
+uuids UUID_generator;
 
 static boolean doConnect = false;
 static boolean connected = false;
@@ -22,7 +23,7 @@ std::vector<BLEClient *> clients; // one BLEClient object per connected server
 
 hw_timer_t *timer_5sec = NULL;
 
-static void notifyCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length,
+void notifyCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length,
                            bool isNotify)
 {
     Serial.print("Notify data from peripheral: ");
@@ -34,20 +35,6 @@ static void notifyCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, ui
     Serial.print(". Length: ");
     Serial.println(length);
 }
-
-class ClientCallback : public BLEClientCallbacks
-{
-    void onConnect(BLEClient *pclient)
-    {
-    }
-
-    void onDisconnect(BLEClient *pclient)
-    {
-        connected = false;
-        digitalWrite(LED_BUILTIN, LOW);
-        Serial.println("onDisconnect...");
-    }
-};
 
 bool connectToServer()
 {
@@ -92,34 +79,6 @@ bool connectToServer()
     return true;
 }
 
-/**
- * Scan for BLE servers and find the first one that advertises the service we are looking for.
- */
-class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
-{
-    /**
-     * Called for each advertising BLE server.
-     */
-    void onResult(BLEAdvertisedDevice advertisedDevice)
-    {
-        // Only connect to the peripheral if:
-        // - correct service is advertised
-        // - RSSI is high enough
-        // Serial.println(advertisedDevice.toString().c_str());
-        if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID) &&
-            (advertisedDevice.getRSSI() >= RSSI_CONNECT))
-        {
-            Serial.println(advertisedDevice.haveServiceUUID());
-            peripheral_device = new BLEAdvertisedDevice(advertisedDevice);
-            doConnect = true;
-            Serial.println("Peripheral found.");
-        }
-        else
-        {
-        }
-    }
-};
-
 void scan()
 {
     pBLEScan->start(SCAN_DURATION, false);
@@ -143,20 +102,20 @@ void disconnect_bad_servers()
 
 void setup()
 {
+    Serial.begin(115200);
+    UUID_generator.initialize_random_values();
+    UUID_generator.generate_hashes();
+    Serial.printf("SERVICE UUID - %s\n", UUID_generator.get_service_uuid());
+    Serial.printf("SERVICE UUID - %s\n", UUID_generator.get_characteristic_uuid());
 
-    Serial.begin(115200); // Debug output
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, LOW);
-
-    Serial.println("THIS IS THE CLIENT/RECEIVER");
-    BLEDevice::init(DEVICE_NAME);
+    BLEDevice::init("AGGREGATOR");
     pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
     pBLEScan->setInterval(SCAN_INTERVAL);
     pBLEScan->setWindow(SCAN_WINDOW);
     pBLEScan->setActiveScan(true);
 
-    scan(); // initial scan
+    scan();
 }
 
 void loop()
@@ -178,5 +137,4 @@ void loop()
 
     scan();
     disconnect_bad_servers(); // ultimately make this asynchronous with FreeRTOS task
-    delay(5000);
 }
