@@ -71,7 +71,7 @@ class CharacteristicCallbacks : public BLECharacteristicCallbacks
         pCharacteristic->setValue(str_data.str());
     }
 
-    void onNotify(BLECharacteristic *pCharacteristic, uint8_t *pData, size_t length,
+    static void onNotify(BLERemoteCharacteristic *pCharacteristic, uint8_t *pData, size_t length,
                            bool isNotify)
     {
         Serial.print("Notify data from peripheral: ");
@@ -106,14 +106,14 @@ class ServerCallbacks : public BLEServerCallbacks
     void onConnect(BLEServer *pServer)
     {
         clientConnected = true;
-        Serial.printf("Connected....\n");
+        Serial.println("Connected....\n");
         BLEDevice::stopAdvertising();
     }
 
     void onDisconnect(BLEServer *pServer)
     {
         clientConnected = false;
-        Serial.printf("Disconnected....\n");
+        Serial.println("Disconnected....\n");
         BLEDevice::startAdvertising();
     }
 };
@@ -131,8 +131,10 @@ class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
         // Only connect to the peripheral if:
         // - correct service is advertised
         // - RSSI is high enough
-        if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID) &&
-            (advertisedDevice.getRSSI() >= RSSI_CONNECT))
+        //fix soon
+        //if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID) &&
+        //    (advertisedDevice.getRSSI() >= RSSI_CONNECT))
+        if (advertisedDevice.haveName() && advertisedDevice.getName() == "S0" && (advertisedDevice.getRSSI() >= RSSI_CONNECT))
         {
             Serial.println(advertisedDevice.haveServiceUUID());
             peripheral_device = new BLEAdvertisedDevice(advertisedDevice);
@@ -183,13 +185,14 @@ template <typename _UUID_Generator_Type> class Bluetooth
 
         BLEDevice::init("A0");
         pServer = BLEDevice::createServer();
+        pServer->setCallbacks(new ServerCallbacks);
         pService = pServer->createService(_uuid_gen_struct.get_service_uuid());
         pCharacteristic = pService->createCharacteristic(
             _uuid_gen_struct.get_characteristic_uuid(),
             BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
 
         pCharacteristic->setCallbacks(callback_class);
-        pCharacteristic->setValue("Sensor Node");
+        pCharacteristic->setValue("Agg Node");
         pService->start();
 
         pAdvertising = pServer->getAdvertising();
@@ -197,7 +200,6 @@ template <typename _UUID_Generator_Type> class Bluetooth
         pAdvertising->setScanResponse(false);
         pAdvertising->setMinPreferred(0x0);
         pAdvertising->start();
-        // will add semaphore so advertising and scanning can't be simultaneous
         BLEDevice::init("A0");
         pBLEScan = BLEDevice::getScan();
         pBLEScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
@@ -227,7 +229,6 @@ template <typename _UUID_Generator_Type> class Bluetooth
             Serial.println(peripheral_device->getAddress().toString().c_str());
 
             BLEClient *pClient = BLEDevice::createClient();
-            clients.push_back(pClient);
 
             pClient->setClientCallbacks(new ClientCallback());
 
@@ -237,27 +238,26 @@ template <typename _UUID_Generator_Type> class Bluetooth
             pClient->setMTU(40); // arbitrary MTU. The max is supposedly 517
 
             // prep primary service object
-            BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
+            BLERemoteService *pRemoteService = pClient->getService(_uuid_gen_struct.get_service_uuid());
             if (pRemoteService == nullptr)
             {
-                Serial.print("Failed to find our service UUID: ");
-                Serial.println(serviceUUID.toString().c_str());
+                Serial.println("Incorrect service UUID");
                 pClient->disconnect();
                 return false;
             }
 
             // prep characteristic object (Just one for now. Later: add multiple for sharing other info (battery status etc.))
-            BLERemoteCharacteristic *pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+            BLERemoteCharacteristic *pRemoteCharacteristic = pRemoteService->getCharacteristic(_uuid_gen_struct.get_characteristic_uuid());
             if (pRemoteCharacteristic == nullptr)
             {
-                Serial.print("Failed to find our characteristic UUID: ");
-                Serial.println(charUUID.toString().c_str());
+                Serial.println("Incorrect characteristic UUID");
                 pClient->disconnect();
                 return false;
             }
 
+            clients.push_back(pClient);
             // prep to receive notifications from peripheral
-            pRemoteCharacteristic->registerForNotify(notifyCallback);
+            pRemoteCharacteristic->registerForNotify(callback_class->onNotify);
 
             serverConnected = true;
             digitalWrite(LED_BUILTIN, HIGH);
@@ -286,6 +286,11 @@ template <typename _UUID_Generator_Type> class Bluetooth
                 i--;
             }
         }
+    }
+
+    bool clientIsConnected()
+    {
+        return clientConnected;
     }
 };
 
