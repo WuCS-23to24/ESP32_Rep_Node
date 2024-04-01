@@ -6,6 +6,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <sstream>
+#include <queue>
 
 #define RSSI_CONNECT -80
 #define RSSI_DISCONNECT -90
@@ -26,6 +27,8 @@ typedef struct __attribute__((__packed__)) BluetoothTransmissionData
     float longitude;
     float altitude;
 } BluetoothTransmissionData_t;
+
+std::queue<BluetoothTransmissionData_t *> received_packets;
 
 typedef union BluetoothTransmissionDataConverter_u {
 
@@ -71,17 +74,10 @@ class CharacteristicCallbacks : public BLECharacteristicCallbacks
         pCharacteristic->setValue(str_data.str());
     }
 
-    static void onNotify(BLERemoteCharacteristic *pCharacteristic, uint8_t *pData, size_t length,
-                           bool isNotify)
+
+    void onNotify(BLECharacteristic *pCharacteristic)
     {
-        Serial.print("Notify data from peripheral: ");
-        // print entire recieved packet by byte
-        for (int i = 0; i < length; i++)
-        {
-            Serial.print(*(pData + i), HEX);
-        }
-        Serial.print(". Length: ");
-        Serial.println(length);
+        printf("NOTIFED\n");
     }
 
     void onStatus(BLECharacteristic *pCharacteristic, Status s, uint32_t code)
@@ -131,9 +127,7 @@ class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
         // Only connect to the peripheral if:
         // - correct service is advertised
         // - RSSI is high enough
-        //fix soon
-        //if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID) &&
-        //    (advertisedDevice.getRSSI() >= RSSI_CONNECT))
+        // Match sensors based on name
         if (advertisedDevice.haveName() && advertisedDevice.getName() == "S0" && (advertisedDevice.getRSSI() >= RSSI_CONNECT))
         {
             peripheral_device = new BLEAdvertisedDevice(advertisedDevice);
@@ -208,6 +202,22 @@ template <typename _UUID_Generator_Type> class Bluetooth
 
     }
 
+    static void clientOnNotify(BLERemoteCharacteristic *pCharacteristic, uint8_t *pData, size_t length,
+                           bool isNotify)
+    {
+        // verrry dangerous :)
+        auto data = (BluetoothTransmissionData_t *)pData; 
+        received_packets.push(data);
+        Serial.print("Notify data from peripheral: ");
+        // print entire recieved packet by byte
+        for (int i = 0; i < length; i++)
+        {
+            Serial.print(*(pData + i), HEX);
+        }
+        Serial.print(". Length: ");
+        Serial.println(length);
+    }
+
     void sendData()
     {
         if (clientConnected)
@@ -237,7 +247,6 @@ template <typename _UUID_Generator_Type> class Bluetooth
             pClient->setMTU(40); // arbitrary MTU. The max is supposedly 517
 
             // prep primary service object
-            // fix to get proper uuid later
             BLERemoteService *pRemoteService = pClient->getService(_uuid_gen_struct.get_service_uuid());
             if (pRemoteService == nullptr)
             {
@@ -257,7 +266,7 @@ template <typename _UUID_Generator_Type> class Bluetooth
 
             clients.push_back(pClient);
             // prep to receive notifications from peripheral
-            pRemoteCharacteristic->registerForNotify(callback_class->onNotify);
+            pRemoteCharacteristic->registerForNotify(clientOnNotify);
 
             serverConnected = true;
             return true;

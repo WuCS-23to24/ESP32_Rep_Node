@@ -25,6 +25,13 @@ void loop()
     if (bluetooth.clientIsConnected()) // only worry about finding sensors after repeater is connected
     {
         digitalWrite(LED_BUILTIN, HIGH);
+        if (received_packets.size() > 0)
+        {
+            // admittedly cursed
+            bluetooth.callback_class->setData(* received_packets.front());
+            received_packets.pop();
+            bluetooth.sendData();
+        }
         bluetooth.tryConnectToServer();
         // ALWAYS scan, because devices could become available at any time
         bluetooth.scan();
