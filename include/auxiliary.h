@@ -9,14 +9,14 @@
 struct uuids
 {
   private:
-    char *service_uuid = nullptr;
-    char *characteristic_uuid = nullptr;
-    uint32_t rand1 = 0, rand2 = 0, rand3 = 0, rand4 = 0;
+    char *service_uuid = "d544bcdc-58fc-4f26-a5a4-24e8fd7f12ae";
+    char *characteristic_uuid = "f74fbe6b-bed4-492b-b9ed-928869ee9fd3";
+    /*uint32_t rand1 = 0, rand2 = 0, rand3 = 0, rand4 = 0;
     UUID uuid2;
-    UUID uuid1;
+    UUID uuid1;*/
 
   public:
-    uuids()
+    /*uuids()
     {
     }
     ~uuids()
@@ -44,7 +44,7 @@ struct uuids
 
         service_uuid = uuid1.toCharArray();
         characteristic_uuid = uuid2.toCharArray();
-    }
+    }*/
 
     char *get_service_uuid()
     {
