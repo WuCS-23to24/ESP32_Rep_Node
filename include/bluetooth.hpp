@@ -106,14 +106,14 @@ class ServerCallbacks : public BLEServerCallbacks
     void onConnect(BLEServer *pServer)
     {
         clientConnected = true;
-        Serial.println("Connected....\n");
+        Serial.println("Repeater connected.\n");
         BLEDevice::stopAdvertising();
     }
 
     void onDisconnect(BLEServer *pServer)
     {
         clientConnected = false;
-        Serial.println("Disconnected....\n");
+        Serial.println("Repeater disconnected.\n");
         BLEDevice::startAdvertising();
     }
 };
@@ -136,7 +136,6 @@ class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
         //    (advertisedDevice.getRSSI() >= RSSI_CONNECT))
         if (advertisedDevice.haveName() && advertisedDevice.getName() == "S0" && (advertisedDevice.getRSSI() >= RSSI_CONNECT))
         {
-            Serial.println(advertisedDevice.haveServiceUUID());
             peripheral_device = new BLEAdvertisedDevice(advertisedDevice);
             doServerConnect = true;
             Serial.println("Peripheral found.");
@@ -151,13 +150,13 @@ class ClientCallback : public BLEClientCallbacks
 {
     void onConnect(BLEClient *pclient)
     {
+        Serial.println("A sensor connected.");
     }
 
     void onDisconnect(BLEClient *pclient)
     {
         serverConnected = false;
-        digitalWrite(LED_BUILTIN, LOW);
-        Serial.println("onDisconnect...");
+        Serial.println("A sensor disconnected.");
     }
 };
 
@@ -238,6 +237,7 @@ template <typename _UUID_Generator_Type> class Bluetooth
             pClient->setMTU(40); // arbitrary MTU. The max is supposedly 517
 
             // prep primary service object
+            // fix to get proper uuid later
             BLERemoteService *pRemoteService = pClient->getService(_uuid_gen_struct.get_service_uuid());
             if (pRemoteService == nullptr)
             {
@@ -260,7 +260,6 @@ template <typename _UUID_Generator_Type> class Bluetooth
             pRemoteCharacteristic->registerForNotify(callback_class->onNotify);
 
             serverConnected = true;
-            digitalWrite(LED_BUILTIN, HIGH);
             return true;
         }
 
@@ -274,14 +273,18 @@ template <typename _UUID_Generator_Type> class Bluetooth
     
     void removeOldServers()
     {
+        // one client object per connected server. So each represents a server. (Confusing.)
         BLEClient *client;
         for (int i = 0; i < clients.size(); i++)
         {
             client = clients[i];
-            if (client->getRssi() < RSSI_DISCONNECT)
+            if (client->getRssi() < RSSI_DISCONNECT) // remove clients with poor connection
             {
                 Serial.println("RSSI fell below threshold. Disconnecting from server.");
                 client->disconnect();
+                clients.erase(clients.begin() + i);
+                i--;
+            } else if (!client->isConnected()) { // remove already disconnected clients
                 clients.erase(clients.begin() + i);
                 i--;
             }
