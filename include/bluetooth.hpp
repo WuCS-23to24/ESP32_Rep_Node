@@ -15,7 +15,6 @@
 #define SCAN_INTERVAL 500
 
 // globals BAD
-bool clientConnected = false;
 bool serverConnected = false;
 boolean doServerConnect = false;
 BLEAdvertisedDevice *peripheral_device;
@@ -37,83 +36,6 @@ typedef union BluetoothTransmissionDataConverter_u {
 
 } BluetoothTransmissionDataConverter_t;
 
-class CharacteristicCallbacks : public BLECharacteristicCallbacks
-{
-  private:
-    BluetoothTransmissionData _data;
-
-  public:
-    CharacteristicCallbacks()
-    {
-    }
-
-    void onWrite(BLECharacteristic *pCharacteristic, esp_ble_gatts_cb_param_t *param)
-    {
-        std::string value = pCharacteristic->getValue();
-
-        if (value.length() > 0)
-        {
-            Serial.println("*********");
-            Serial.print("New value: ");
-            for (int i = 0; i < value.length(); i++)
-                Serial.print(value[i]);
-
-            Serial.println();
-            Serial.println("*********");
-        }
-    }
-
-    void onRead(BLECharacteristic *pCharacteristic, esp_ble_gatts_cb_param_t *param)
-    {
-        std::stringstream str_data("");
-        str_data << "TEMP: " << _data.temp_data << " LAT: " << _data.latitude << " LONG: " << _data.longitude
-                 << " ALT: " << _data.altitude;
-
-        Serial.println(str_data.str().c_str());
-
-        pCharacteristic->setValue(str_data.str());
-    }
-
-
-    void onNotify(BLECharacteristic *pCharacteristic)
-    {
-        printf("NOTIFED\n");
-    }
-
-    void onStatus(BLECharacteristic *pCharacteristic, Status s, uint32_t code)
-    {
-        printf("STATUS\n");
-    }
-
-    BluetoothTransmissionData getData()
-    {
-        return _data;
-    }
-
-    void setData(BluetoothTransmissionData data)
-    {
-        _data = data;
-    }
-};
-
-class ServerCallbacks : public BLEServerCallbacks
-{
-  public:
-    void onConnect(BLEServer *pServer)
-    {
-        clientConnected = true;
-        Serial.println("Repeater connected.\n");
-        BLEDevice::stopAdvertising();
-    }
-
-    void onDisconnect(BLEServer *pServer)
-    {
-        clientConnected = false;
-        Serial.println("Repeater disconnected.\n");
-        BLEDevice::startAdvertising();
-    }
-};
-
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
@@ -128,7 +50,7 @@ class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
         // - correct service is advertised
         // - RSSI is high enough
         // Match sensors based on name
-        if (advertisedDevice.haveName() && advertisedDevice.getName() == "S0" && (advertisedDevice.getRSSI() >= RSSI_CONNECT))
+        if (advertisedDevice.haveName() && advertisedDevice.getName() == "A0" && (advertisedDevice.getRSSI() >= RSSI_CONNECT))
         {
             peripheral_device = new BLEAdvertisedDevice(advertisedDevice);
             doServerConnect = true;
@@ -144,56 +66,31 @@ class ClientCallback : public BLEClientCallbacks
 {
     void onConnect(BLEClient *pclient)
     {
-        Serial.println("A sensor connected.");
+        Serial.println("An aggregator connected.");
     }
 
     void onDisconnect(BLEClient *pclient)
     {
         serverConnected = false;
-        Serial.println("A sensor disconnected.");
+        Serial.println("An aggregator disconnected.");
     }
 };
 
 template <typename _UUID_Generator_Type> class Bluetooth
 {
   private:
-    BLEServer *pServer;
-    BLEService *pService;
-    BLECharacteristic *pCharacteristic;
-    BLEAdvertising *pAdvertising;
     _UUID_Generator_Type _uuid_gen_struct;
     BLEScan *pBLEScan;
     std::vector<BLEClient *> clients; // one BLEClient object per connected server
 
   public:
-    CharacteristicCallbacks *callback_class;
-
     Bluetooth()
     {
     }
 
     Bluetooth(_UUID_Generator_Type uuid_gen_struct) : _uuid_gen_struct(uuid_gen_struct)
     {
-        callback_class = new CharacteristicCallbacks();
-
-        BLEDevice::init("A0");
-        pServer = BLEDevice::createServer();
-        pServer->setCallbacks(new ServerCallbacks);
-        pService = pServer->createService(_uuid_gen_struct.get_service_uuid());
-        pCharacteristic = pService->createCharacteristic(
-            _uuid_gen_struct.get_characteristic_uuid(),
-            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY);
-
-        pCharacteristic->setCallbacks(callback_class);
-        pCharacteristic->setValue("Agg Node");
-        pService->start();
-
-        pAdvertising = pServer->getAdvertising();
-        pAdvertising->addServiceUUID(_uuid_gen_struct.get_service_uuid());
-        pAdvertising->setScanResponse(false);
-        pAdvertising->setMinPreferred(0x0);
-        pAdvertising->start();
-        BLEDevice::init("A0");
+        BLEDevice::init("R0");
         pBLEScan = BLEDevice::getScan();
         pBLEScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
         pBLEScan->setInterval(SCAN_INTERVAL);
@@ -216,17 +113,6 @@ template <typename _UUID_Generator_Type> class Bluetooth
         }
         Serial.print(". Length: ");
         Serial.println(length);
-    }
-
-    void sendData()
-    {
-        if (clientConnected)
-        {
-            BluetoothTransmissionDataConverter_t converter;
-            converter.message = callback_class->getData();
-            pCharacteristic->setValue(converter.bytes, sizeof(BluetoothTransmissionData));
-            pCharacteristic->notify();
-        }
     }
 
     bool tryConnectToServer()
@@ -298,11 +184,6 @@ template <typename _UUID_Generator_Type> class Bluetooth
                 i--;
             }
         }
-    }
-
-    bool clientIsConnected()
-    {
-        return clientConnected;
     }
 };
 
