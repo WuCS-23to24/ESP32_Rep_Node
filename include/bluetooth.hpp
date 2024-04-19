@@ -7,6 +7,7 @@
 #include <BLEUtils.h>
 #include <sstream>
 #include <queue>
+#include "data_packet.h"
 
 #define RSSI_CONNECT -80
 #define RSSI_DISCONNECT -90
@@ -19,20 +20,12 @@ bool serverConnected = false;
 boolean doServerConnect = false;
 BLEAdvertisedDevice *peripheral_device;
 
-typedef struct __attribute__((__packed__)) BluetoothTransmissionData
-{
-    float temp_data;
-    float latitude;
-    float longitude;
-    float altitude;
-} BluetoothTransmissionData_t;
+std::queue<TransmissionData_t> received_packets;
 
-std::queue<BluetoothTransmissionData_t> received_packets;
+typedef union TransmissionDataConverter_u {
 
-typedef union BluetoothTransmissionDataConverter_u {
-
-    BluetoothTransmissionData_t message;
-    uint8_t bytes[sizeof(BluetoothTransmissionData)];
+    TransmissionData_t message;
+    uint8_t bytes[sizeof(TransmissionData)];
 
 } BluetoothTransmissionDataConverter_t;
 
@@ -103,7 +96,7 @@ template <typename _UUID_Generator_Type> class Bluetooth
                            bool isNotify)
     {
         // verrry dangerous :)
-        auto data = (BluetoothTransmissionData_t *)pData; 
+        auto data = (TransmissionData_t *)pData; 
         received_packets.push(*data);
         Serial.print("Notify data from peripheral: ");
         // print entire recieved packet by byte
