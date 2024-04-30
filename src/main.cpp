@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <BLEDevice.h>
-#include <vector>
 #include "esp_task_wdt.h"
 
 #include "auxiliary.h"
@@ -24,6 +23,7 @@ std::queue<TransmissionData_t *> received_packets;
 
 void main_loop(void *args);
 
+// ISR for handling various semaphores
 void ARDUINO_ISR_ATTR set_semaphore()
 {
     taskENTER_CRITICAL_ISR(&isr_mux);
@@ -50,8 +50,6 @@ void setup()
 {
     Serial.begin(115200);
     pinMode(LED_BUILTIN, OUTPUT);
-    //UUID_generator.initialize_random_values();
-    //UUID_generator.generate_hashes();
     Serial.printf("SERVICE UUID - %s\n", UUID_generator.get_service_uuid());
     Serial.printf("CHARACTERISTIC UUID - %s\n", UUID_generator.get_characteristic_uuid());
     bluetooth = Bluetooth<uuids>(UUID_generator);
@@ -61,7 +59,10 @@ void setup()
     setup_timer(set_semaphore, 250, 80);
 
     esp_task_wdt_init(UINT32_MAX, false); // make task_wdt wait as long as possible, until we come up with better solution
+
+    // CPU Core 0: acoustic receive
     xTaskCreatePinnedToCore(acoustic_receive_loop, "acoustic_receive_loop", 4096, NULL, 19, &acoustic_task_handle, 0); // priority at least 19
+    // CPU Core 1: BLE client
     xTaskCreatePinnedToCore(main_loop, "main_loop", 4096*4, NULL, 19, &main_task_handle, 1); // priority at least 19
 }
 
@@ -84,7 +85,6 @@ void main_loop(void *args)
     }
 }
 
-void loop()
+void loop() // intentionally blank
 {
-
 }

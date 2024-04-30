@@ -6,7 +6,7 @@ uint16_t frame_data_decoded[100] = {};
 uint16_t getParity16(uint16_t n);
 uint8_t adc_pin = A0;
 
-
+// Main acoustic receive code
 void acoustic_receive_loop(void *args)
 {
     analogReadResolution(12);

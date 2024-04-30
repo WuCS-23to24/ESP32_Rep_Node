@@ -46,6 +46,7 @@ class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
     }
 };
 
+// Functions for connection/disconnection with aggregators
 class ClientCallback : public BLEClientCallbacks
 {
     void onConnect(BLEClient *pclient)
@@ -60,6 +61,7 @@ class ClientCallback : public BLEClientCallbacks
     }
 };
 
+// main class for handling BLE 
 template <typename _UUID_Generator_Type> class Bluetooth
 {
   private:
@@ -74,6 +76,7 @@ template <typename _UUID_Generator_Type> class Bluetooth
 
     Bluetooth(_UUID_Generator_Type uuid_gen_struct) : _uuid_gen_struct(uuid_gen_struct)
     {
+        // initialize as client scanning for servers
         BLEDevice::init("R0");
         pBLEScan = BLEDevice::getScan();
         pBLEScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
@@ -83,6 +86,7 @@ template <typename _UUID_Generator_Type> class Bluetooth
 
     }
 
+    // Run whenever a message is received from an aggregator
     static void clientOnNotify(BLERemoteCharacteristic *pCharacteristic, uint8_t *pData, size_t length,
                            bool isNotify)
     {
@@ -138,11 +142,13 @@ template <typename _UUID_Generator_Type> class Bluetooth
         return false;
     }
 
+    // Scan for available aggregators
     void scan()
     {
         pBLEScan->start(SCAN_DURATION, false);
     }
     
+    // Disconnect servers from the list that are no longer connected or are already disconnected
     void removeOldServers()
     {
         // one client object per connected server. So each represents a server. (Confusing.)
