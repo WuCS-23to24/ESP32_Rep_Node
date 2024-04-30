@@ -1,9 +1,10 @@
 #include <stdint.h>
 #include <Arduino.h>
+#include "data_packet.h"
 
 uint16_t frame_data_decoded[100] = {};
 uint16_t getParity16(uint16_t n);
-uint8_t adc_pin = A0;//digitalPinToPinName(A0);
+uint8_t adc_pin = A0;
 
 
 void acoustic_receive_loop(void *args)
@@ -143,6 +144,9 @@ void acoustic_receive_loop(void *args)
         {
             frame_data_decoded[frame_index] = decoded_data;
             Serial.printf("Decoded frame %i. Frame data: 0x%08X. ");
+            auto packet = new TransmissionData_t;
+            packet->temp_data = (float) decoded_data;
+            received_packets.push(packet);
             if (getParity16(frame_data_decoded[frame_index]))
             {
                 Serial.printf("Parity incorrect. Error detected.\n");
@@ -153,25 +157,6 @@ void acoustic_receive_loop(void *args)
                 Serial.printf("Parity correct.\n");
             }
             frame_index++;
-        }
-
-        // STEP 5: PROCESS DECODED MESSAGE 
-        if (frame_index > 99)
-        {
-            Serial.printf("Sequence of 100 frames receieved. Writing to file and comparing to expected frame sequence.\n");
-            // to do: write results to a file
-
-            /*for (int i = 0; i < 100; i++)
-            {
-                if (frame_data_decoded[i] != frame_data[i])
-                {
-                    frame_mismatch_counter++;
-                }
-            } */
-            Serial.printf("Frame parity errors detected: %i. Frame mismatch errors detected: %i.\n", frame_parity_error_counter, frame_mismatch_counter);
-            frame_parity_error_counter = 0;
-            frame_mismatch_counter = 0; 
-            frame_index = 0;
         }
     }
 }

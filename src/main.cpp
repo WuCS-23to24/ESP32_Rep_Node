@@ -20,6 +20,8 @@ portMUX_TYPE isr_mux = portMUX_INITIALIZER_UNLOCKED;
 TaskHandle_t acoustic_task_handle = NULL;
 TaskHandle_t main_task_handle = NULL;
 
+std::queue<TransmissionData_t *> received_packets;
+
 void main_loop(void *args);
 
 void ARDUINO_ISR_ATTR set_semaphore()

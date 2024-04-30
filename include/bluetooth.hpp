@@ -20,15 +20,6 @@ bool serverConnected = false;
 boolean doServerConnect = false;
 BLEAdvertisedDevice *peripheral_device;
 
-std::queue<TransmissionData_t> received_packets;
-
-typedef union TransmissionDataConverter_u {
-
-    TransmissionData_t message;
-    uint8_t bytes[sizeof(TransmissionData)];
-
-} BluetoothTransmissionDataConverter_t;
-
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
@@ -95,17 +86,10 @@ template <typename _UUID_Generator_Type> class Bluetooth
     static void clientOnNotify(BLERemoteCharacteristic *pCharacteristic, uint8_t *pData, size_t length,
                            bool isNotify)
     {
-        // verrry dangerous :)
-        auto data = (TransmissionData_t *)pData; 
-        received_packets.push(*data);
-        Serial.print("Notify data from peripheral: ");
-        // print entire recieved packet by byte
-        for (int i = 0; i < length; i++)
-        {
-            Serial.print(*(pData + i), HEX);
-        }
-        Serial.print(". Length: ");
-        Serial.println(length);
+        TransmissionData_t *data = new TransmissionData_t;
+        float temp = *((float *)pData);
+        data->temp_data = temp; 
+        received_packets.push(data);
     }
 
     bool tryConnectToServer()
